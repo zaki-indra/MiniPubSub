@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: MiniPubSub
+Description: Embeddable binary TCP publish/subscribe broker and client
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lminipubsub
+Libs.private: -pthread
+Cflags: -I${includedir}

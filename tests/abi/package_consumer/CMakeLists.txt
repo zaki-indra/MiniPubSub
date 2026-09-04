@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(MiniPubSubPackageConsumer LANGUAGES C)
+find_package(MiniPubSub 1 REQUIRED)
+add_executable(package_consumer main.c)
+target_link_libraries(package_consumer PRIVATE MiniPubSub::shared)

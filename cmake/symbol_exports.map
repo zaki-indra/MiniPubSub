@@ -1,0 +1,6 @@
+MPS_1.0 {
+  global:
+    mps_*;
+  local:
+    *;
+};
