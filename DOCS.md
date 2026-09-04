@@ -122,7 +122,9 @@ MiniPubSub/
 │   │   └── server_runtime.cpp      Threaded accept/broker/connection runtime
 │   └── cli/
 │       ├── server_main.cpp         Standalone server
-│       └── client_main.cpp         Command-line client
+│       ├── client_main.cpp         One-shot and interactive client
+│       ├── client_command.cpp      REPL parsing and byte formatting
+│       └── client_command.hpp      Internal CLI command model
 ├── tests/
 │   ├── unit/                       Protocol and broker tests
 │   ├── integration/                Public API and raw TCP tests
@@ -139,19 +141,33 @@ are private and may change without an ABI version change.
 
 ### 4.1 Normal build
 
+The checked-in presets are the recommended development interface:
+
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
+```
+
+Equivalent manual configuration remains supported:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
+`CMakePresets.json` supplies `debug`, `release`, `static`, `asan`, `ubsan`, and
+`tsan` configure/build/test presets. Preset output is isolated under
+`build/<preset-name>/`.
+
 The build produces:
 
 ```text
-build/libminipubsub.so
-build/libminipubsub.a
-build/minipubsub-server
-build/minipubsub-cli
+build/debug/libminipubsub.so
+build/debug/libminipubsub.a
+build/debug/minipubsub-server
+build/debug/minipubsub-cli
 ```
 
 Tests use loopback TCP sockets. An execution sandbox that denies `bind(2)` or
@@ -172,13 +188,13 @@ Tests use loopback TCP sockets. An execution sandbox that denies `bind(2)` or
 Example sanitizer builds:
 
 ```sh
-cmake -S . -B build-asan -DMPS_ENABLE_ADDRESS_SANITIZER=ON
-cmake --build build-asan -j
-ctest --test-dir build-asan --output-on-failure
+cmake --preset asan
+cmake --build --preset asan
+ctest --preset asan
 
-cmake -S . -B build-tsan -DMPS_ENABLE_THREAD_SANITIZER=ON
-cmake --build build-tsan -j
-ctest --test-dir build-tsan --output-on-failure
+cmake --preset tsan
+cmake --build --preset tsan
+ctest --preset tsan
 ```
 
 Python loading an ASan-instrumented shared library may require preloading the
@@ -188,7 +204,7 @@ ASan runtime. This is a property of the Python process, not of MiniPubSub's
 ### 4.3 Installation and downstream CMake use
 
 ```sh
-cmake --install build --prefix /opt/minipubsub
+cmake --install build/debug --prefix /opt/minipubsub
 ```
 
 Installed CMake targets are:
@@ -972,19 +988,54 @@ stop and waiting for shutdown.
 
 ### 14.2 Client
 
-```sh
-./build/minipubsub-cli ping
-./build/minipubsub-cli publish news "hello"
-./build/minipubsub-cli subscribe news
-./build/minipubsub-cli unsubscribe news
+With no positional command, the client opens an interactive session:
 
-./build/minipubsub-cli --host 127.0.0.1 --port 7379 ping
+```sh
+./build/debug/minipubsub-cli --host 127.0.0.1 --port 7379
+> SUBSCRIBE news
+OK
+> PUBLISH news "hello world"
+!msg "news": hello world
+OK
+> PUBLISH news
+ERROR: Invalid Argument
+> EXIT
+bye. :)
+```
+
+Commands are case-insensitive. `PING`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`,
+`HELP`, `EXIT`, and `QUIT` are supported. Each broker command waits up to 30
+seconds for its correlated response. Publications can arrive between commands
+or while a command is waiting; the callback prints them immediately and redraws
+the prompt when it was visible.
+
+Arguments use shell-like grouping. Single quotes preserve their contents,
+double quotes group text, and adjacent quoted and unquoted fragments form one
+argument. Backslash escapes support `\\`, `\\"`, `\\'`, `\\n`, `\\r`, `\\t`,
+`\\0`, and `\\xHH`. For example, `PUBLISH binary "a\\0b"` sends a three-byte
+message. An explicit empty message is written as `PUBLISH channel ""`.
+
+Received bytes are rendered safely: printable ASCII remains readable and
+quotes, backslashes, controls, and non-printable bytes are escaped. The channel
+is quoted in interactive message output. Prompt redraw does not reconstruct
+partially typed terminal text, although that input remains available to the
+terminal and is still submitted normally.
+
+Supplying a positional command selects the existing one-shot mode:
+
+```sh
+./build/debug/minipubsub-cli ping
+./build/debug/minipubsub-cli publish news "hello"
+./build/debug/minipubsub-cli subscribe news
+./build/debug/minipubsub-cli unsubscribe news
+
+./build/debug/minipubsub-cli --host 127.0.0.1 --port 7379 ping
 ```
 
 The CLI deliberately uses only the installed C API. This makes it a small real
 consumer of the ABI rather than a privileged path into internal C++ classes.
-Its command-line arguments are text, even though the underlying library accepts
-binary channels and messages.
+One-shot command-line arguments are text. Interactive escapes can represent
+binary channels and messages supported by the underlying library.
 
 ## 15. Test suite
 
@@ -992,7 +1043,9 @@ binary channels and messages.
 |--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
 | `tests/unit/protocol_tests.cpp`            | Golden header bytes, one-byte fragmentation, coalesced frames, fatal headers, limits, trailing bytes                         |
 | `tests/unit/broker_tests.cpp`              | Duplicate subscribe, idempotent unsubscribe, fan-out, shared frame identity, disconnect cleanup, invalid request IDs         |
+| `tests/unit/cli_command_tests.cpp`         | Interactive command casing, quoting, escapes, arity validation, and safe byte formatting                                   |
 | `tests/integration/integration_tests.cpp`  | Port-zero server, binary pub/sub, ping, concurrent publishers, callback dispatch, callback-safe stop, active-client shutdown |
+| `tests/integration/cli_tests.cpp`          | Interactive process I/O, responses, message delivery, invalid input, help, exit, and one-shot compatibility                  |
 | `tests/integration/tcp_protocol_tests.cpp` | Real fragmented raw TCP, recoverable unknown opcode, flags error then close, fatal bad magic                                 |
 | `tests/abi/c_consumer.c`                   | Strict C header and shared-library consumption                                                                               |
 | `tests/abi/cpp_consumer.cpp`               | C headers remain valid in C++                                                                                                |

@@ -5,10 +5,17 @@ and a C++23 implementation. The ABI is designed for direct use from C and
 foreign-function interfaces.
 
 ```sh
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
 ```
 
-Run `build/minipubsub-server`, then use `build/minipubsub-cli ping` or
-`build/minipubsub-cli publish CHANNEL MESSAGE`.
+Run `build/debug/minipubsub-server`, then start an interactive client:
+
+```sh
+build/debug/minipubsub-cli --host 127.0.0.1 --port 7379
+```
+
+The prompt accepts `PING`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `HELP`, and
+`EXIT`. Existing one-shot commands such as `build/debug/minipubsub-cli ping`
+remain available for scripts.
