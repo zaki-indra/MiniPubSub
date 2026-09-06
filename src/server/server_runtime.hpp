@@ -31,10 +31,10 @@ public:
     ServerRuntime(const ServerRuntime&) = delete;
     ServerRuntime& operator=(const ServerRuntime&) = delete;
 
-    mps_status_t start(std::string& error, int& system_code);
-    std::uint16_t bound_port() const noexcept;
-    void request_stop() noexcept;
-    void wait() noexcept;
+    mps_status_t start(std::string& error, int& system_code) const;
+    [[nodiscard]] std::uint16_t bound_port() const noexcept;
+    void request_stop() const noexcept;
+    void wait() const noexcept;
 
 private:
     class Impl;

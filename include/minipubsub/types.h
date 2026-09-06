@@ -97,7 +97,7 @@ typedef struct mps_log_record {
     const char* message;
 } mps_log_record_t;
 
-typedef void (MPS_CALL *mps_log_callback_t)(const mps_log_record_t* record,
+typedef void (MPS_CALL* mps_log_callback_t)(const mps_log_record_t* record,
                                             void* user_data);
 
 #define MPS_LOG_DEBUG ((mps_log_severity_t)1)

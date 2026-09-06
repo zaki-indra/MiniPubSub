@@ -70,7 +70,7 @@ public:
         core::ConnectionId id{};
         protocol::Frame frame;
 
-        std::size_t retained_bytes() const noexcept {
+        [[nodiscard]] std::size_t retained_bytes() const noexcept {
             return sizeof(Command) + frame.payload.size();
         }
     };
@@ -94,8 +94,7 @@ public:
         ~Connection() {
             stop();
             join();
-            const int fd = socket_.exchange(-1);
-            if (fd >= 0) {
+            if (const int fd = socket_.exchange(-1); fd >= 0) {
                 ::close(fd);
             }
         }
@@ -183,8 +182,7 @@ public:
 
         void thread_finished() noexcept {
             if (live_threads_.fetch_sub(1U, std::memory_order_acq_rel) == 1U) {
-                const int fd = socket_.exchange(-1);
-                if (fd >= 0) {
+                if (const int fd = socket_.exchange(-1); fd >= 0) {
                     ::close(fd);
                 }
             }
@@ -300,7 +298,7 @@ public:
 
         int candidate = -1;
         int last_error = 0;
-        for (auto* address = addresses; address != nullptr;
+        for (const addrinfo* address = addresses; address != nullptr;
              address = address->ai_next) {
             candidate = ::socket(address->ai_family, address->ai_socktype,
                                  address->ai_protocol);
@@ -308,8 +306,8 @@ public:
                 last_error = errno;
                 continue;
             }
-            const int enabled = 1;
-            (void)::setsockopt(candidate, SOL_SOCKET, SO_REUSEADDR, &enabled,
+            constexpr int enabled = 1;
+            ::setsockopt(candidate, SOL_SOCKET, SO_REUSEADDR, &enabled,
                                sizeof(enabled));
             if (::bind(candidate, address->ai_addr, address->ai_addrlen) == 0 &&
                 ::listen(candidate, SOMAXCONN) == 0) {
@@ -413,16 +411,14 @@ public:
     }
 
     void request_stop() noexcept {
-        const auto current = state.load();
-        if (current == State::created || current == State::stopped) {
+        if (const auto current = state.load(); current == State::created || current == State::stopped) {
             if (current == State::created) {
                 state.store(State::stopped);
             }
             return;
         }
         state.store(State::stopping);
-        const int fd = listener.load();
-        if (fd >= 0) {
+        if (const int fd = listener.load(); fd >= 0) {
             ::shutdown(fd, SHUT_RDWR);
         }
         std::vector<std::shared_ptr<Connection>> snapshot;
@@ -620,7 +616,7 @@ ServerRuntime::ServerRuntime(Config config)
 
 ServerRuntime::~ServerRuntime() = default;
 
-mps_status_t ServerRuntime::start(std::string& error, int& system_code) {
+mps_status_t ServerRuntime::start(std::string& error, int& system_code) const {
     return impl_->start(error, system_code);
 }
 
@@ -628,11 +624,11 @@ std::uint16_t ServerRuntime::bound_port() const noexcept {
     return impl_->bound_port_value;
 }
 
-void ServerRuntime::request_stop() noexcept {
+void ServerRuntime::request_stop() const noexcept {
     impl_->request_stop();
 }
 
-void ServerRuntime::wait() noexcept {
+void ServerRuntime::wait() const noexcept {
     impl_->wait();
 }
 

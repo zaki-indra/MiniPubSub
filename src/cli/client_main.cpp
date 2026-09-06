@@ -8,7 +8,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <csignal>
-#include <cstdint>
 #include <cerrno>
 #include <iostream>
 #include <mutex>
